@@ -56,18 +56,19 @@ def chunk_keys_from_zarray(prefix: str, zarray: dict) -> Iterator[str]:
     Yield all chunk keys for an array given its .zarray metadata dict and its
     path prefix within the store (e.g. "" for root, "signal" for signal/.zarray).
 
-    Zarr v2 chunk keys look like:  {prefix}/{c0}.{c1}.{c2}...
-    For a 1-D array they are simply: {prefix}/{c0}
+    The dimension separator (. or /) is read from the zarray metadata.
+    Defaults to "/" — NWB/DANDI zarrs almost universally use directory-style
+    keys (e.g. 0/0/12/7/120) rather than dot-separated ones (0.0.12.7.120).
     """
     shape: list[int] = zarray["shape"]
     chunks: list[int] = zarray["chunks"]
-    ndim = len(shape)
+    sep: str = zarray.get("dimension_separator", "/")
 
     # Number of chunks along each dimension
     n_chunks = [math.ceil(s / c) for s, c in zip(shape, chunks)]
 
     for indices in itertools.product(*[range(n) for n in n_chunks]):
-        key = ".".join(str(i) for i in indices)
+        key = sep.join(str(i) for i in indices)
         yield f"{prefix}/{key}" if prefix else key
 
 
