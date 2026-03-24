@@ -51,7 +51,7 @@ def single_api_redirect(
     t0 = time.perf_counter()
     resp = session.get(url, allow_redirects=False)
     elapsed = time.perf_counter() - t0
-    s3_url = resp.headers.get("Location") if resp.status_code == 302 else None
+    s3_url = resp.headers.get("Location") if resp.is_redirect else None
     return elapsed, s3_url
 
 
