@@ -47,11 +47,11 @@ def single_api_redirect(
     path: str,
 ) -> tuple[float, str | None]:
     """Single API redirect request. Returns (elapsed_seconds, s3_url)."""
-    url = f"{api_url}/api/zarr/version/{version_id}/file/{path}"
+    url = f"{api_url}/api/zarr/version/{version_id}/file/{path}/"
     t0 = time.perf_counter()
     resp = session.get(url, allow_redirects=False)
     elapsed = time.perf_counter() - t0
-    s3_url = resp.headers.get("Location") if resp.is_redirect else None
+    s3_url = resp.headers.get("Location") or None if resp.is_redirect else None
     return elapsed, s3_url
 
 

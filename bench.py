@@ -61,13 +61,13 @@ def api_redirect(
     Returns (elapsed_seconds, s3_url).
     Does not follow the redirect — only measures the API leg.
     """
-    url = f"{api_url}/api/zarr/version/{version_id}/file/{path}"
+    url = f"{api_url}/api/zarr/version/{version_id}/file/{path}/"
     t0 = time.perf_counter()
     resp = session.get(url, allow_redirects=False)
     elapsed = time.perf_counter() - t0
 
     if resp.is_redirect:
-        return elapsed, resp.headers.get("Location")
+        return elapsed, resp.headers.get("Location") or None
 
     resp.raise_for_status()
     return elapsed, None
