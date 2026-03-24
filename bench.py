@@ -66,7 +66,7 @@ def api_redirect(
     resp = session.get(url, allow_redirects=False)
     elapsed = time.perf_counter() - t0
 
-    if resp.status_code == 302:
+    if resp.is_redirect:
         return elapsed, resp.headers.get("Location")
 
     resp.raise_for_status()
