@@ -9,7 +9,7 @@ dependencies = [
 
 [project.scripts]
 discover-chunks = "discover_chunks:main"
-bench = "bench:main"
+bench-latency = "bench_latency:main"
 bench-concurrency = "bench_concurrency:main"
 report = "report:main"
 

@@ -15,12 +15,12 @@ This lets you compare orders of magnitude:
   API overhead  vs  raw S3 round-trip  vs  actual data transfer cost
 
 Usage:
-    python bench.py \\
-        --chunks-file chunks_<version_id>.json \\
+    python bench_latency.py \\
+        --chunks-file <version_id>_chunks_<timestamp>.json \\
         [--token <api-token>] \\
         [--sample 100] \\
         [--download-sample 10] \\
-        [--output results.json]
+        [--output <version_id>_latency_<timestamp>.json]
 
 Environment:
     DANDI_API_KEY  — API token (alternative to --token)
@@ -32,6 +32,8 @@ import argparse
 import json
 import os
 import random
+import shlex
+import sys
 import time
 
 import requests
@@ -170,7 +172,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         default=None,
-        help="Output JSON file path (default: results_<version_id>.json)",
+        help="Output JSON file path (default: <version_id>_latency_<timestamp>.json)",
     )
     args = parser.parse_args()
 
@@ -194,7 +196,8 @@ def main() -> None:
             f"[bold]Will fully download {min(args.download_sample, len(chunks))} chunks"
         )
 
-    output_file = args.output or f"results_{version_id}.json"
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    output_file = args.output or f"{version_id}_latency_{timestamp}.json"
     session = make_session(args.token)
     results = run_bench(
         session, api_url, version_id, chunks, download_sample=args.download_sample
@@ -203,16 +206,19 @@ def main() -> None:
 
     with open(output_file, "w") as f:
         json.dump(
-            [
-                {
-                    "path": r.path,
-                    "api_redirect_time_s": r.api_redirect_time,
-                    "s3_direct_time_s": r.s3_direct_time,
-                    "download_time_s": r.download_time,
-                    "download_bytes": r.download_bytes,
-                }
-                for r in results
-            ],
+            {
+                "command": shlex.join(sys.argv),
+                "results": [
+                    {
+                        "path": r.path,
+                        "api_redirect_time_s": r.api_redirect_time,
+                        "s3_direct_time_s": r.s3_direct_time,
+                        "download_time_s": r.download_time,
+                        "download_bytes": r.download_bytes,
+                    }
+                    for r in results
+                ],
+            },
             f,
             indent=2,
         )
