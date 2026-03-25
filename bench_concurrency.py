@@ -121,7 +121,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         default=None,
-        help="Save results to a JSON file for later analysis",
+        help="Output JSON file path (default: concurrency_results_<version_id>.json)",
     )
     args = parser.parse_args()
 
@@ -133,6 +133,7 @@ def main() -> None:
     chunks: list[str] = chunk_data["chunks"]
     levels = [int(x.strip()) for x in args.levels.split(",")]
     n = args.requests_per_level
+    output_file = args.output or f"concurrency_results_{version_id}.json"
     session = make_session(args.token)
 
     console.print(f"[bold]Concurrency saturation test: version [cyan]{version_id}[/cyan]")
@@ -227,10 +228,9 @@ def main() -> None:
         "Rising latency + plateauing req/s indicates saturation.[/dim]"
     )
 
-    if args.output:
-        with open(args.output, "w") as f:
-            json.dump(all_results, f, indent=2)
-        console.print(f"\n[bold green]Results saved to {args.output}")
+    with open(output_file, "w") as f:
+        json.dump(all_results, f, indent=2)
+    console.print(f"\n[bold green]Results saved to {output_file}")
 
 
 if __name__ == "__main__":
