@@ -12,7 +12,6 @@ discover-chunks = "discover_chunks:main"
 bench = "bench:main"
 bench-concurrency = "bench_concurrency:main"
 report = "report:main"
-report-concurrency = "report_concurrency:main"
 
 [build-system]
 requires = ["hatchling"]
