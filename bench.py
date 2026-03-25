@@ -218,7 +218,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         default=None,
-        help="Save raw results to a JSON file for later analysis",
+        help="Output JSON file path (default: results_<version_id>.json)",
     )
     args = parser.parse_args()
 
@@ -242,29 +242,29 @@ def main() -> None:
             f"[bold]Will fully download {min(args.download_sample, len(chunks))} chunks"
         )
 
+    output_file = args.output or f"results_{version_id}.json"
     session = make_session(args.token)
     results = run_bench(
         session, api_url, version_id, chunks, download_sample=args.download_sample
     )
     report(results)
 
-    if args.output:
-        with open(args.output, "w") as f:
-            json.dump(
-                [
-                    {
-                        "path": r.path,
-                        "api_redirect_time_s": r.api_redirect_time,
-                        "s3_direct_time_s": r.s3_direct_time,
-                        "download_time_s": r.download_time,
-                        "download_bytes": r.download_bytes,
-                    }
-                    for r in results
-                ],
-                f,
-                indent=2,
-            )
-        console.print(f"[bold green]Raw results saved to {args.output}")
+    with open(output_file, "w") as f:
+        json.dump(
+            [
+                {
+                    "path": r.path,
+                    "api_redirect_time_s": r.api_redirect_time,
+                    "s3_direct_time_s": r.s3_direct_time,
+                    "download_time_s": r.download_time,
+                    "download_bytes": r.download_bytes,
+                }
+                for r in results
+            ],
+            f,
+            indent=2,
+        )
+    console.print(f"[bold green]Raw results saved to {output_file}")
 
 
 if __name__ == "__main__":
