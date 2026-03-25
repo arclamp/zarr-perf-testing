@@ -32,6 +32,8 @@ import concurrent.futures
 import json
 import os
 import random
+import shlex
+import sys
 import time
 
 import requests
@@ -198,7 +200,7 @@ def main() -> None:
     report_concurrency(all_results)
 
     with open(output_file, "w") as f:
-        json.dump(all_results, f, indent=2)
+        json.dump({"command": shlex.join(sys.argv), "results": all_results}, f, indent=2)
     console.print(f"\n[bold green]Results saved to {output_file}")
 
 

@@ -32,6 +32,8 @@ import argparse
 import json
 import os
 import random
+import shlex
+import sys
 import time
 
 import requests
@@ -204,16 +206,19 @@ def main() -> None:
 
     with open(output_file, "w") as f:
         json.dump(
-            [
-                {
-                    "path": r.path,
-                    "api_redirect_time_s": r.api_redirect_time,
-                    "s3_direct_time_s": r.s3_direct_time,
-                    "download_time_s": r.download_time,
-                    "download_bytes": r.download_bytes,
-                }
-                for r in results
-            ],
+            {
+                "command": shlex.join(sys.argv),
+                "results": [
+                    {
+                        "path": r.path,
+                        "api_redirect_time_s": r.api_redirect_time,
+                        "s3_direct_time_s": r.s3_direct_time,
+                        "download_time_s": r.download_time,
+                        "download_bytes": r.download_bytes,
+                    }
+                    for r in results
+                ],
+            },
             f,
             indent=2,
         )

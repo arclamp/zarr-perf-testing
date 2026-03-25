@@ -33,14 +33,16 @@ def main() -> None:
     with open(args.results_file) as f:
         data = json.load(f)
 
-    if not data:
+    results = data["results"] if isinstance(data, dict) else data
+
+    if not results:
         raise SystemExit("Results file is empty")
 
-    first = data[0]
+    first = results[0]
     if "path" in first:
-        report([ChunkResult.from_dict(d) for d in data])
+        report([ChunkResult.from_dict(d) for d in results])
     elif "concurrency" in first:
-        report_concurrency(data)
+        report_concurrency(results)
     else:
         raise SystemExit(
             "Unrecognized results file format — expected bench_latency.py or bench_concurrency.py output"

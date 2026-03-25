@@ -32,6 +32,8 @@ import json
 import math
 import os
 import random
+import shlex
+import sys
 import time
 from typing import Iterator
 
@@ -182,6 +184,7 @@ def main() -> None:
         console.print(f"[yellow]Sampled down to {len(chunks)} chunks")
 
     payload = {
+        "command": shlex.join(sys.argv),
         "api_url": api_url,
         "version_id": args.version_id,
         "chunks": chunks,
