@@ -2,7 +2,7 @@
 """
 Replay a benchmark report from a saved results file.
 
-Auto-detects whether the file was produced by bench.py (sequential latency) or
+Auto-detects whether the file was produced by bench_latency.py (sequential latency) or
 bench_concurrency.py (concurrency saturation) and prints the appropriate report.
 
 Usage:
@@ -20,13 +20,13 @@ from utils import ChunkResult, report, report_concurrency
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Print a benchmark report from a saved bench.py or bench_concurrency.py results file",
+        description="Print a benchmark report from a saved bench_latency.py or bench_concurrency.py results file",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "--results-file",
         required=True,
-        help="JSON file produced by bench.py or bench_concurrency.py",
+        help="JSON file produced by bench_latency.py or bench_concurrency.py",
     )
     args = parser.parse_args()
 
@@ -43,7 +43,7 @@ def main() -> None:
         report_concurrency(data)
     else:
         raise SystemExit(
-            "Unrecognized results file format — expected bench.py or bench_concurrency.py output"
+            "Unrecognized results file format — expected bench_latency.py or bench_concurrency.py output"
         )
 
 

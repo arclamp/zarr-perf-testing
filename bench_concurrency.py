@@ -15,11 +15,11 @@ S3 direct measurements so the comparison is on the same set of objects.
 
 Usage:
     python bench_concurrency.py \\
-        --chunks-file chunks_<version_id>.json \\
+        --chunks-file <version_id>_chunks_<timestamp>.json \\
         [--token <api-token>] \\
         [--levels "1,2,4,8,16,32"] \\
         [--requests-per-level 50] \\
-        [--output concurrency_results.json]
+        [--output <version_id>_concurrency_<timestamp>.json]
 
 Environment:
     DANDI_API_KEY  — API token (alternative to --token)
@@ -120,7 +120,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         default=None,
-        help="Output JSON file path (default: concurrency_results_<version_id>.json)",
+        help="Output JSON file path (default: <version_id>_concurrency_<timestamp>.json)",
     )
     args = parser.parse_args()
 
@@ -132,7 +132,8 @@ def main() -> None:
     chunks: list[str] = chunk_data["chunks"]
     levels = [int(x.strip()) for x in args.levels.split(",")]
     n = args.requests_per_level
-    output_file = args.output or f"concurrency_results_{version_id}.json"
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    output_file = args.output or f"{version_id}_concurrency_{timestamp}.json"
     session = make_session(args.token)
 
     console.print(f"[bold]Concurrency saturation test: version [cyan]{version_id}[/cyan]")

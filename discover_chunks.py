@@ -10,7 +10,7 @@ Discovery order:
   1. Fetch /.zmetadata (consolidated metadata) — enumerates all arrays in one shot
   2. Fall back to /.zarray at the root if consolidated metadata is absent
 
-Output is a JSON file consumed by bench.py and bench_concurrency.py.
+Output is a JSON file consumed by bench_latency.py and bench_concurrency.py.
 
 Usage:
     python discover_chunks.py \\
@@ -18,7 +18,7 @@ Usage:
         --version-id <version-uuid> \\
         [--token <api-token>] \\
         [--sample 100] \\
-        [--output chunks.json]
+        [--output <version_id>_chunks_<timestamp>.json]
 
 Environment:
     DANDI_API_KEY  — API token (alternative to --token)
@@ -157,12 +157,13 @@ def main() -> None:
     parser.add_argument(
         "--output",
         default=None,
-        help="Output JSON file path (default: chunks_<version_id>.json)",
+        help="Output JSON file path (default: <version_id>_chunks_<timestamp>.json)",
     )
     args = parser.parse_args()
 
     api_url = args.api_url.rstrip("/")
-    output_file = args.output or f"chunks_{args.version_id}.json"
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    output_file = args.output or f"{args.version_id}_chunks_{timestamp}.json"
     session = make_session(args.token)
 
     console.print(
