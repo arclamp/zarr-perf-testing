@@ -35,9 +35,8 @@ import random
 import time
 
 import requests
-from rich.table import Table
 
-from utils import Stats, console, make_session
+from utils import Stats, console, make_session, report_concurrency
 
 
 def single_api_redirect(
@@ -155,20 +154,6 @@ def main() -> None:
 
     console.print(f"[green]Collected {len(s3_url_pool)} S3 URLs\n")
 
-    table = Table(
-        title="Concurrency Saturation Results",
-        show_header=True,
-        header_style="bold magenta",
-    )
-    table.add_column("Concurrency", justify="right", style="cyan")
-    table.add_column("API mean (ms)", justify="right")
-    table.add_column("API p95 (ms)", justify="right")
-    table.add_column("API req/s", justify="right")
-    table.add_column("S3 mean (ms)", justify="right")
-    table.add_column("S3 p95 (ms)", justify="right")
-    table.add_column("S3 req/s", justify="right")
-    table.add_column("Overhead ratio", justify="right")
-
     all_results = []
 
     for level in levels:
@@ -188,19 +173,6 @@ def main() -> None:
         s3_timings, s3_wall = run_concurrent(single_s3_direct, s3_args, level)
         s3 = Stats(s3_timings)
         s3_rps = n / s3_wall
-
-        ratio = api.mean / s3.mean
-
-        table.add_row(
-            str(level),
-            f"{api.mean * 1000:.1f}",
-            f"{api.p95 * 1000:.1f}",
-            f"{api_rps:.1f}",
-            f"{s3.mean * 1000:.1f}",
-            f"{s3.p95 * 1000:.1f}",
-            f"{s3_rps:.1f}",
-            f"{ratio:.2f}x",
-        )
 
         all_results.append(
             {
@@ -222,11 +194,7 @@ def main() -> None:
         console.print("done")
 
     console.print()
-    console.print(table)
-    console.print(
-        "\n[dim]Overhead ratio = API mean / S3 mean. "
-        "Rising latency + plateauing req/s indicates saturation.[/dim]"
-    )
+    report_concurrency(all_results)
 
     with open(output_file, "w") as f:
         json.dump(all_results, f, indent=2)

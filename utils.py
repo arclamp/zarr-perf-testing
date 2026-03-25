@@ -102,6 +102,44 @@ def print_latency_table(title: str, rows: list[tuple[str, Stats]]) -> None:
     console.print(table)
 
 
+def report_concurrency(results: list[dict]) -> None:
+    """Print the concurrency saturation table from saved concurrency_results JSON data."""
+    table = Table(
+        title="Concurrency Saturation Results",
+        show_header=True,
+        header_style="bold magenta",
+    )
+    table.add_column("Concurrency", justify="right", style="cyan")
+    table.add_column("API mean (ms)", justify="right")
+    table.add_column("API p95 (ms)", justify="right")
+    table.add_column("API req/s", justify="right")
+    table.add_column("S3 mean (ms)", justify="right")
+    table.add_column("S3 p95 (ms)", justify="right")
+    table.add_column("S3 req/s", justify="right")
+    table.add_column("Overhead ratio", justify="right")
+
+    for r in results:
+        api = r["api"]
+        s3 = r["s3"]
+        ratio = api["mean_ms"] / s3["mean_ms"]
+        table.add_row(
+            str(r["concurrency"]),
+            f"{api['mean_ms']:.1f}",
+            f"{api['p95_ms']:.1f}",
+            f"{api['throughput_rps']:.1f}",
+            f"{s3['mean_ms']:.1f}",
+            f"{s3['p95_ms']:.1f}",
+            f"{s3['throughput_rps']:.1f}",
+            f"{ratio:.2f}x",
+        )
+
+    console.print(table)
+    console.print(
+        "\n[dim]Overhead ratio = API mean / S3 mean. "
+        "Rising latency + plateauing req/s indicates saturation.[/dim]"
+    )
+
+
 def report(results: list[ChunkResult]) -> None:
     api_timings = [r.api_redirect_time for r in results]
     s3_timings = [r.s3_direct_time for r in results if r.s3_direct_time is not None]
