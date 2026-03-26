@@ -69,6 +69,9 @@ def api_redirect(
 def s3_direct_ttfb(session: requests.Session, s3_url: str) -> float:
     """
     GET the S3 URL and measure time to first byte (response headers).
+    Uses the shared session so the S3 connection is warm, consistent with
+    the warm API connection used in Phase 1. Run warm_up() before the
+    measurement loop to seed the connection pool.
     Does not read the body.
     """
     t0 = time.perf_counter()
@@ -114,6 +117,27 @@ def s3_download(session: requests.Session, s3_url: str) -> tuple[float, int]:
     return elapsed, total_bytes
 
 
+def warm_up(
+    session: requests.Session,
+    api_url: str,
+    version_id: str,
+    chunks: list[str],
+    n: int = 3,
+) -> None:
+    """
+    Make n unmeasured API + S3 TTFB requests to seed the connection pool
+    before measurements begin, ensuring both Phase 1 and Phase 2 see warm
+    connections from the first measured chunk onward.
+    """
+    paths = random.sample(chunks, min(n, len(chunks)))
+    with console.status("[bold yellow]Warming up connections...") as status:
+        for i, path in enumerate(paths):
+            status.update(f"[bold yellow]Warm-up {i + 1}/{len(paths)}")
+            _, s3_url = api_redirect(session, api_url, version_id, path)
+            if s3_url:
+                s3_direct_ttfb(session, s3_url)
+
+
 def run_bench(
     session: requests.Session,
     api_url: str,
@@ -121,6 +145,7 @@ def run_bench(
     chunks: list[str],
     download_sample: int = 0,
 ) -> list[ChunkResult]:
+    warm_up(session, api_url, version_id, chunks)
     download_indices = set(
         random.sample(range(len(chunks)), min(download_sample, len(chunks)))
     )
