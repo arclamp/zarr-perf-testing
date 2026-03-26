@@ -53,6 +53,7 @@ class ChunkResult:
     api_redirect_time: float       # seconds: time to receive redirect from API
     s3_url: str | None             # S3 URL captured from Location header
     s3_direct_time: float | None   # seconds: TTFB hitting S3 URL directly
+    e2e_time: float | None         # seconds: API redirect + S3 TTFB as a single timer
     download_time: float | None    # seconds: full body download from S3
     download_bytes: int | None     # bytes downloaded
 
@@ -64,6 +65,7 @@ class ChunkResult:
             api_redirect_time=d["api_redirect_time_s"],
             s3_url=None,
             s3_direct_time=d.get("s3_direct_time_s"),
+            e2e_time=d.get("e2e_time_s"),
             download_time=d.get("download_time_s"),
             download_bytes=d.get("download_bytes"),
         )
@@ -143,12 +145,15 @@ def report_concurrency(results: list[dict]) -> None:
 def report(results: list[ChunkResult]) -> None:
     api_timings = [r.api_redirect_time for r in results]
     s3_timings = [r.s3_direct_time for r in results if r.s3_direct_time is not None]
+    e2e_timings = [r.e2e_time for r in results if r.e2e_time is not None]
     dl_timings = [r.download_time for r in results if r.download_time is not None]
     dl_bytes = [r.download_bytes for r in results if r.download_bytes is not None]
 
     rows: list[tuple[str, Stats]] = [("API redirect", Stats(api_timings))]
     if s3_timings:
         rows.append(("S3 direct (TTFB)", Stats(s3_timings)))
+    if e2e_timings:
+        rows.append(("E2E (API→S3 TTFB)", Stats(e2e_timings)))
     if dl_timings:
         rows.append(("S3 download (full)", Stats(dl_timings)))
 

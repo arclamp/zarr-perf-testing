@@ -8,11 +8,13 @@ Phases (run sequentially per chunk):
                               Captures the S3 URL from the Location header.
   2. S3 direct latency      — GET the captured S3 URL with stream=True.
                               Measures time to receive response headers (TTFB), no body read.
-  3. Download time          — Fully download the chunk bytes from the same S3 URL.
+  3. E2E latency            — Fresh API redirect + S3 TTFB under a single wall-clock timer.
+                              Measures the true sequential cost a real client experiences.
+  4. Download time          — Fully download the chunk bytes from the same S3 URL.
                               Measured for a random subset of chunks.
 
 This lets you compare orders of magnitude:
-  API overhead  vs  raw S3 round-trip  vs  actual data transfer cost
+  API overhead  vs  raw S3 round-trip  vs  E2E client latency  vs  actual data transfer cost
 
 Usage:
     python bench_latency.py \\
@@ -76,6 +78,28 @@ def s3_direct_ttfb(session: requests.Session, s3_url: str) -> float:
     return elapsed
 
 
+def api_to_s3_ttfb(
+    session: requests.Session,
+    api_url: str,
+    version_id: str,
+    path: str,
+) -> float | None:
+    """
+    Single wall-clock measurement of the full client path: API redirect + S3 TTFB.
+    Returns elapsed_seconds, or None if the API did not redirect.
+    """
+    url = f"{api_url}/api/zarr/version/{version_id}/file/{path}/"
+    t0 = time.perf_counter()
+    resp = session.get(url, allow_redirects=False)
+    if not resp.is_redirect:
+        return None
+    s3_url = resp.headers.get("Location")
+    s3_resp = session.get(s3_url, stream=True)
+    elapsed = time.perf_counter() - t0
+    s3_resp.close()
+    return elapsed
+
+
 def s3_download(session: requests.Session, s3_url: str) -> tuple[float, int]:
     """
     Fully download the chunk from the S3 URL.
@@ -112,7 +136,10 @@ def run_bench(
             # Phase 2: S3 direct latency (TTFB, no body)
             s3_time = s3_direct_ttfb(session, s3_url) if s3_url else None
 
-            # Phase 3 (optional subset): full download
+            # Phase 3: E2E — API redirect + S3 TTFB as a single timer
+            e2e_time = api_to_s3_ttfb(session, api_url, version_id, path)
+
+            # Phase 4 (optional subset): full download
             download_time = None
             download_bytes = None
             if s3_url and i in download_indices:
@@ -124,6 +151,7 @@ def run_bench(
                     api_redirect_time=api_time,
                     s3_url=s3_url,
                     s3_direct_time=s3_time,
+                    e2e_time=e2e_time,
                     download_time=download_time,
                     download_bytes=download_bytes,
                 )
@@ -213,6 +241,7 @@ def main() -> None:
                         "path": r.path,
                         "api_redirect_time_s": r.api_redirect_time,
                         "s3_direct_time_s": r.s3_direct_time,
+                        "e2e_time_s": r.e2e_time,
                         "download_time_s": r.download_time,
                         "download_bytes": r.download_bytes,
                     }
