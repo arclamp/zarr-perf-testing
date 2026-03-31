@@ -8,11 +8,13 @@ Phases (run sequentially per chunk):
                               Captures the S3 URL from the Location header.
   2. S3 direct latency      — GET the captured S3 URL with stream=True.
                               Measures time to receive response headers (TTFB), no body read.
-  3. Download time          — Fully download the chunk bytes from the same S3 URL.
+  3. E2E latency            — Fresh API redirect + S3 TTFB under a single wall-clock timer.
+                              Measures the true sequential cost a real client experiences.
+  4. Download time          — Fully download the chunk bytes from the same S3 URL.
                               Measured for a random subset of chunks.
 
 This lets you compare orders of magnitude:
-  API overhead  vs  raw S3 round-trip  vs  actual data transfer cost
+  API overhead  vs  raw S3 round-trip  vs  E2E client latency  vs  actual data transfer cost
 
 Usage:
     python bench_latency.py \\
@@ -67,6 +69,9 @@ def api_redirect(
 def s3_direct_ttfb(session: requests.Session, s3_url: str) -> float:
     """
     GET the S3 URL and measure time to first byte (response headers).
+    Uses the shared session so the S3 connection is warm, consistent with
+    the warm API connection used in Phase 1. Run warm_up() before the
+    measurement loop to seed the connection pool.
     Does not read the body.
     """
     t0 = time.perf_counter()
@@ -74,6 +79,45 @@ def s3_direct_ttfb(session: requests.Session, s3_url: str) -> float:
     elapsed = time.perf_counter() - t0
     resp.close()
     return elapsed
+
+
+def api_to_s3_ttfb(
+    session: requests.Session,
+    api_url: str,
+    version_id: str,
+    path: str,
+) -> float | None:
+    """
+    Single wall-clock measurement of the full client path: API redirect + S3 TTFB.
+    Follows the redirect automatically (as a real client would).
+    Returns elapsed_seconds, or None if the API did not redirect.
+    """
+    url = f"{api_url}/api/zarr/version/{version_id}/file/{path}/"
+    t0 = time.perf_counter()
+    resp = session.get(url, allow_redirects=True, stream=True)
+    elapsed = time.perf_counter() - t0
+    resp.close()
+    return elapsed if resp.history else None
+
+
+def api_to_s3_download(
+    session: requests.Session,
+    api_url: str,
+    version_id: str,
+    path: str,
+) -> tuple[float, int] | None:
+    """
+    E2E measurement: API redirect + full chunk download under a single timer.
+    Returns (elapsed_seconds, total_bytes), or None if the API did not redirect.
+    """
+    url = f"{api_url}/api/zarr/version/{version_id}/file/{path}/"
+    t0 = time.perf_counter()
+    resp = session.get(url, allow_redirects=True, stream=True)
+    total_bytes = 0
+    for chunk in resp.iter_content(chunk_size=64 * 1024 * 1024):
+        total_bytes += len(chunk)
+    elapsed = time.perf_counter() - t0
+    return (elapsed, total_bytes) if resp.history else None
 
 
 def s3_download(session: requests.Session, s3_url: str) -> tuple[float, int]:
@@ -84,10 +128,31 @@ def s3_download(session: requests.Session, s3_url: str) -> tuple[float, int]:
     t0 = time.perf_counter()
     resp = session.get(s3_url, stream=True)
     total_bytes = 0
-    for chunk in resp.iter_content(chunk_size=65536):
+    for chunk in resp.iter_content(chunk_size=64 * 1024 * 1024):
         total_bytes += len(chunk)
     elapsed = time.perf_counter() - t0
     return elapsed, total_bytes
+
+
+def warm_up(
+    session: requests.Session,
+    api_url: str,
+    version_id: str,
+    chunks: list[str],
+    n: int = 3,
+) -> None:
+    """
+    Make n unmeasured API + S3 TTFB requests to seed the connection pool
+    before measurements begin, ensuring both Phase 1 and Phase 2 see warm
+    connections from the first measured chunk onward.
+    """
+    paths = random.sample(chunks, min(n, len(chunks)))
+    with console.status("[bold yellow]Warming up connections...") as status:
+        for i, path in enumerate(paths):
+            status.update(f"[bold yellow]Warm-up {i + 1}/{len(paths)}")
+            _, s3_url = api_redirect(session, api_url, version_id, path)
+            if s3_url:
+                s3_direct_ttfb(session, s3_url)
 
 
 def run_bench(
@@ -97,6 +162,7 @@ def run_bench(
     chunks: list[str],
     download_sample: int = 0,
 ) -> list[ChunkResult]:
+    warm_up(session, api_url, version_id, chunks)
     download_indices = set(
         random.sample(range(len(chunks)), min(download_sample, len(chunks)))
     )
@@ -112,11 +178,21 @@ def run_bench(
             # Phase 2: S3 direct latency (TTFB, no body)
             s3_time = s3_direct_ttfb(session, s3_url) if s3_url else None
 
-            # Phase 3 (optional subset): full download
+            # Phase 3: E2E — API redirect + S3 TTFB as a single timer
+            e2e_time = api_to_s3_ttfb(session, api_url, version_id, path)
+
+            # Phase 4 (optional subset): S3 direct full download
             download_time = None
             download_bytes = None
-            if s3_url and i in download_indices:
-                download_time, download_bytes = s3_download(session, s3_url)
+            # Phase 5 (optional subset): E2E full download
+            e2e_download_time = None
+            e2e_download_bytes = None
+            if i in download_indices:
+                if s3_url:
+                    download_time, download_bytes = s3_download(session, s3_url)
+                result = api_to_s3_download(session, api_url, version_id, path)
+                if result:
+                    e2e_download_time, e2e_download_bytes = result
 
             results.append(
                 ChunkResult(
@@ -124,8 +200,11 @@ def run_bench(
                     api_redirect_time=api_time,
                     s3_url=s3_url,
                     s3_direct_time=s3_time,
+                    e2e_time=e2e_time,
                     download_time=download_time,
                     download_bytes=download_bytes,
+                    e2e_download_time=e2e_download_time,
+                    e2e_download_bytes=e2e_download_bytes,
                 )
             )
 
@@ -213,8 +292,11 @@ def main() -> None:
                         "path": r.path,
                         "api_redirect_time_s": r.api_redirect_time,
                         "s3_direct_time_s": r.s3_direct_time,
+                        "e2e_time_s": r.e2e_time,
                         "download_time_s": r.download_time,
                         "download_bytes": r.download_bytes,
+                        "e2e_download_time_s": r.e2e_download_time,
+                        "e2e_download_bytes": r.e2e_download_bytes,
                     }
                     for r in results
                 ],
