@@ -157,13 +157,13 @@ def report(results: list[ChunkResult]) -> None:
 
     rows: list[tuple[str, Stats]] = [("API redirect", Stats(api_timings))]
     if s3_timings:
-        rows.append(("S3 direct (TTFB)", Stats(s3_timings)))
+        rows.append(("S3 TTFB", Stats(s3_timings)))
     if e2e_timings:
-        rows.append(("E2E (API→S3 TTFB)", Stats(e2e_timings)))
+        rows.append(("E2E TTFB", Stats(e2e_timings)))
     if dl_timings:
-        rows.append(("S3 download (full)", Stats(dl_timings)))
+        rows.append(("S3 download", Stats(dl_timings)))
     if e2e_dl_timings:
-        rows.append(("E2E download (full)", Stats(e2e_dl_timings)))
+        rows.append(("E2E download", Stats(e2e_dl_timings)))
 
     print_latency_table("Zarr Chunk Access Benchmark", rows)
 
