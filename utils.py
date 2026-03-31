@@ -54,8 +54,10 @@ class ChunkResult:
     s3_url: str | None             # S3 URL captured from Location header
     s3_direct_time: float | None   # seconds: TTFB hitting S3 URL directly
     e2e_time: float | None         # seconds: API redirect + S3 TTFB as a single timer
-    download_time: float | None    # seconds: full body download from S3
-    download_bytes: int | None     # bytes downloaded
+    download_time: float | None    # seconds: full body download from S3 directly
+    download_bytes: int | None     # bytes downloaded (S3 direct)
+    e2e_download_time: float | None  # seconds: API redirect + full body download
+    e2e_download_bytes: int | None   # bytes downloaded (E2E)
 
     @classmethod
     def from_dict(cls, d: dict) -> ChunkResult:
@@ -68,6 +70,8 @@ class ChunkResult:
             e2e_time=d.get("e2e_time_s"),
             download_time=d.get("download_time_s"),
             download_bytes=d.get("download_bytes"),
+            e2e_download_time=d.get("e2e_download_time_s"),
+            e2e_download_bytes=d.get("e2e_download_bytes"),
         )
 
 
@@ -148,6 +152,8 @@ def report(results: list[ChunkResult]) -> None:
     e2e_timings = [r.e2e_time for r in results if r.e2e_time is not None]
     dl_timings = [r.download_time for r in results if r.download_time is not None]
     dl_bytes = [r.download_bytes for r in results if r.download_bytes is not None]
+    e2e_dl_timings = [r.e2e_download_time for r in results if r.e2e_download_time is not None]
+    e2e_dl_bytes = [r.e2e_download_bytes for r in results if r.e2e_download_bytes is not None]
 
     rows: list[tuple[str, Stats]] = [("API redirect", Stats(api_timings))]
     if s3_timings:
@@ -156,6 +162,8 @@ def report(results: list[ChunkResult]) -> None:
         rows.append(("E2E (API→S3 TTFB)", Stats(e2e_timings)))
     if dl_timings:
         rows.append(("S3 download (full)", Stats(dl_timings)))
+    if e2e_dl_timings:
+        rows.append(("E2E download (full)", Stats(e2e_dl_timings)))
 
     print_latency_table("Zarr Chunk Access Benchmark", rows)
 

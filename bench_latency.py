@@ -100,6 +100,26 @@ def api_to_s3_ttfb(
     return elapsed if resp.history else None
 
 
+def api_to_s3_download(
+    session: requests.Session,
+    api_url: str,
+    version_id: str,
+    path: str,
+) -> tuple[float, int] | None:
+    """
+    E2E measurement: API redirect + full chunk download under a single timer.
+    Returns (elapsed_seconds, total_bytes), or None if the API did not redirect.
+    """
+    url = f"{api_url}/api/zarr/version/{version_id}/file/{path}/"
+    t0 = time.perf_counter()
+    resp = session.get(url, allow_redirects=True, stream=True)
+    total_bytes = 0
+    for chunk in resp.iter_content(chunk_size=64 * 1024 * 1024):
+        total_bytes += len(chunk)
+    elapsed = time.perf_counter() - t0
+    return (elapsed, total_bytes) if resp.history else None
+
+
 def s3_download(session: requests.Session, s3_url: str) -> tuple[float, int]:
     """
     Fully download the chunk from the S3 URL.
@@ -161,11 +181,18 @@ def run_bench(
             # Phase 3: E2E — API redirect + S3 TTFB as a single timer
             e2e_time = api_to_s3_ttfb(session, api_url, version_id, path)
 
-            # Phase 4 (optional subset): full download
+            # Phase 4 (optional subset): S3 direct full download
             download_time = None
             download_bytes = None
-            if s3_url and i in download_indices:
-                download_time, download_bytes = s3_download(session, s3_url)
+            # Phase 5 (optional subset): E2E full download
+            e2e_download_time = None
+            e2e_download_bytes = None
+            if i in download_indices:
+                if s3_url:
+                    download_time, download_bytes = s3_download(session, s3_url)
+                result = api_to_s3_download(session, api_url, version_id, path)
+                if result:
+                    e2e_download_time, e2e_download_bytes = result
 
             results.append(
                 ChunkResult(
@@ -176,6 +203,8 @@ def run_bench(
                     e2e_time=e2e_time,
                     download_time=download_time,
                     download_bytes=download_bytes,
+                    e2e_download_time=e2e_download_time,
+                    e2e_download_bytes=e2e_download_bytes,
                 )
             )
 
@@ -266,6 +295,8 @@ def main() -> None:
                         "e2e_time_s": r.e2e_time,
                         "download_time_s": r.download_time,
                         "download_bytes": r.download_bytes,
+                        "e2e_download_time_s": r.e2e_download_time,
+                        "e2e_download_bytes": r.e2e_download_bytes,
                     }
                     for r in results
                 ],
