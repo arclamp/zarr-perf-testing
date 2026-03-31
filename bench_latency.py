@@ -108,7 +108,7 @@ def s3_download(session: requests.Session, s3_url: str) -> tuple[float, int]:
     t0 = time.perf_counter()
     resp = session.get(s3_url, stream=True)
     total_bytes = 0
-    for chunk in resp.iter_content(chunk_size=65536):
+    for chunk in resp.iter_content(chunk_size=64 * 1024 * 1024):
         total_bytes += len(chunk)
     elapsed = time.perf_counter() - t0
     return elapsed, total_bytes
