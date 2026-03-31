@@ -89,18 +89,15 @@ def api_to_s3_ttfb(
 ) -> float | None:
     """
     Single wall-clock measurement of the full client path: API redirect + S3 TTFB.
+    Follows the redirect automatically (as a real client would).
     Returns elapsed_seconds, or None if the API did not redirect.
     """
     url = f"{api_url}/api/zarr/version/{version_id}/file/{path}/"
     t0 = time.perf_counter()
-    resp = session.get(url, allow_redirects=False)
-    if not resp.is_redirect:
-        return None
-    s3_url = resp.headers.get("Location")
-    s3_resp = session.get(s3_url, stream=True)
+    resp = session.get(url, allow_redirects=True, stream=True)
     elapsed = time.perf_counter() - t0
-    s3_resp.close()
-    return elapsed
+    resp.close()
+    return elapsed if resp.history else None
 
 
 def s3_download(session: requests.Session, s3_url: str) -> tuple[float, int]:
