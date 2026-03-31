@@ -5,6 +5,7 @@ requires-python = ">=3.11"
 dependencies = [
     "requests>=2.31",
     "rich>=13.0",
+    "matplotlib>=3.8",
 ]
 
 [project.scripts]
@@ -12,6 +13,7 @@ discover-chunks = "discover_chunks:main"
 bench-latency = "bench_latency:main"
 bench-concurrency = "bench_concurrency:main"
 report = "report:main"
+plot-latency = "plot_latency:main"
 
 [build-system]
 requires = ["hatchling"]
