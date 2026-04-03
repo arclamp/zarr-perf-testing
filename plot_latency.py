@@ -93,6 +93,7 @@ def main() -> None:
 
     for label, values in latency_series:
         ax_lat.hist(values, bins="fd", alpha=0.5, label=label)
+    ax_lat.set_xlim(left=0)
     ax_lat.set_xlabel("Latency (ms)")
     ax_lat.set_ylabel("Count")
     ax_lat.set_title("Latency Distribution")
@@ -101,6 +102,7 @@ def main() -> None:
     if has_downloads:
         for label, throughputs in download_series:
             ax_dl.hist(throughputs, bins="fd", alpha=0.5, label=label)
+        ax_dl.set_xlim(left=0)
         ax_dl.set_xlabel("Throughput (MB/s)")
         ax_dl.set_ylabel("Count")
         ax_dl.set_title("Download Throughput Distribution")
