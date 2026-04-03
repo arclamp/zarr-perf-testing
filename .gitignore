@@ -1,6 +1,13 @@
 .venv/
 __pycache__/
 *.py[cod]
+# Generated benchmark output files
+# New format: {version_id}_{operation}_{timestamp}.*
+*_chunks_*.json
+*_latency_*.json
+*_concurrency_*.json
+*_latency_*.png
+# Old format: {operation}_{version_id}.*
 chunks_*.json
-results*.json
-concurrency_results*.json
+results_*.json
+concurrency_results_*.json
